@@ -1,0 +1,224 @@
+---
+title: "Sub-Clustering Post End_Date"
+
+output:
+  html_document:
+  df_print: paged
+params:
+  pathRdata:
+    value: x
+  Cut:
+    value: x
+  Gpost:
+    value: x
+  Gselected:
+    value: x
+  Analysis:
+    value: x
+  ClusterName:
+    value: x
+  p:
+    value: x
+---
+  
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "##",
+  results = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  highlight = TRUE,
+  background = 'grey',
+  fig.cap = TRUE
+)
+```
+
+# `r paste("The number of clusters is ", params$Gpost," and we refer to the cluster named ",params$ClusterName)`
+
+```{r setup, echo=FALSE,warning=FALSE, include=FALSE}
+updateNames = function(S.cl){
+    ### I have to change the dataframe names given the new connectro version!!
+      for(gtmp in 1:length(S.cl$Clusters.List)){
+      for(ii in 1:length(S.cl$Clusters.List[[gtmp]]$ClusterAll)){
+        if("Vol" %in% colnames(S.cl$Clusters.List[[gtmp]]$ClusterAll[[ii]]$FCM$cluster$ClustCurve)){
+          S.cl$Clusters.List[[gtmp]]$ClusterAll[[ii]]$FCM$cluster$ClustCurve = S.cl$Clusters.List[[gtmp]]$ClusterAll[[ii]]$FCM$cluster$ClustCurve %>% dplyr::rename(Observation = Vol, Time = Times)
+        }
+      }
+      }
+  return(S.cl)
+}
+
+Cut = params$Cut
+ClusterName = params$ClusterName
+pathRdata = params$pathRdata
+
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+library(plyr)
+library(connector)
+library(RColorBrewer)
+
+load(paste0("../",pathRdata,"/ClusterAnalysisPostEndDate",Cut,"_p", params$p,".RData") )
+source(paste0("../",pathRdata,"/../DataPreparation.R") )
+
+## Seleziono solo il cluster 4 del post before EndDate 
+
+CONNECTORList.post.tillEndDate <- S.cl.Post.tillEndDate$CONNECTORList
+MostProb_Post<-MostProbableClustering.Extrapolation(stability.list = S.cl.Post.tillEndDate,
+                                                    G=params$Gpost)
+
+ClID <- which(MostProb_Post$FCM$cluster$cluster.names == ClusterName )
+data.cl <- MostProb_Post$FCM$cluster$ClustCurve
+data.cl <- data.cl[data.cl$Cluster == ClID,c(1,3,2)]
+Annot.cl <- CONNECTORList.post.tillEndDate$LabCurv[CONNECTORList.post.tillEndDate$LabCurv$ID %in% unique(data.cl$ID),]
+CONNECTORList.cl = DataFrameImport(data.cl,Annot.cl)
+
+gr<-GrowthCurve(CONNECTORList.cl,"ShortID")
+
+grpl<-gr$GrowthCurve_plot 
+grpl$layers[[2]]$aes_params$alpha<-0.9 
+grpl$layers[[1]]$aes_params$alpha<-0.4 
+
+Dataplot<- gr$PlotData 
+
+pl<-ggplot(Dataplot)+
+  geom_line(aes(x=Time,y=Vol,col=ShortID,group=ID),alpha=0.5)+
+  theme(legend.position =  "none")
+
+#ggplotly(pl)
+file= paste0("ClusterAnalysisPostEndDate",Cut,"G",params$Gpost,"_cl",ClusterName,"_p",params$p,".RData")
+if(file.exists(paste0("../",pathRdata,"/",file))){
+  load(paste0("../",pathRdata,"/",file))
+}else{
+  start.post <- Sys.time()
+  S.cl.A <-ClusterAnalysis(CONNECTORList.cl, 
+                                          G = 2:6, p = params$p,
+                                          runs=100,
+                                          Cores = 20)
+  end.time.post<- Sys.time() - start.post
+  save(S.cl.A,end.time.post,file = paste0("../",pathRdata,"/",file))
+}
+
+S.cl.A = updateNames(S.cl.A)
+
+bx<-IndexesPlot.Extrapolation(stability.list = S.cl.A)
+bx$Plot
+
+ConInfo<-ConsMatrix.Extrapolation(stability.list = S.cl.A)
+
+MostProb_Post<-MostProbableClustering.Extrapolation(stability.list = S.cl.A,
+                                                    G=params$Gselected)
+
+FCMplots.post5<- ClusterWithMeanCurve(clusterdata = MostProb_Post,
+                                      feature = "ShortID",
+                                      labels = c("Time","Volume"),
+                                      title= " FCM model")
+
+FCMplots.post5$plotsCluster$ALL$plot_env$curves.tmp-> ClusterCurves
+FCMplots.post5$plotsCluster$ALL$plot_env$symbols-> symbols
+FCMplots.post5$plotsCluster$ALL$plot_env$plot_data-> plot_data
+
+ClusterCurves$Cluster<- paste0(ClusterName,tolower(ClusterCurves$Cluster))
+plot_data$Cluster<- paste0(ClusterName,tolower(plot_data$Cluster))
+symbols<- paste0(ClusterName,tolower(symbols))
+
+color = grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)]
+r<-sample(color, length(unique(CONNECTORList.cl$LabCurv$ShortID)),replace = F )
+
+```
+
+```{r savingRdata,results='asis', echo=FALSE,warning=FALSE, include=FALSE}
+
+CL_Post<-unique(MostProb_Post$FCM$cluster$ClustCurve[,c("ID","Cluster")])
+CLInfo<-merge(CL_Post,CONNECTORList.cl$LabCurv[,c("ID","ShortID","LongID")])
+names(CLInfo) <- c("ID","ClusterPost_Sub","ShortID","LongID")
+
+CLInfo$ClusterPost_Sub <- paste0(ClusterName,tolower(MostProb_Post$FCM$cluster$cluster.names[CLInfo$ClusterPost_Sub]))
+
+FileNameSave = paste0("../",pathRdata,"/AnalysisCluster",params$Cut,"Post",ClusterName,"_G",params$Gselected,"_FromG",params$Gpost,"_p", params$p,".RData")
+save(CLInfo,file = FileNameSave )
+
+
+##### Model per cluster 
+
+countsCl <- CLInfo %>%
+  select(ShortID,ClusterPost_Sub) %>%
+  group_by(ClusterPost_Sub) %>% 
+  dplyr::count(ShortID)
+
+
+
+```
+
+```{r plot,results='asis', echo=FALSE,warning=FALSE,fig.width = 12, fig.height = 10}
+pl
+
+bx$Plot
+
+ConInfo[[paste0("G",params$Gselected)]]$ConsensusPlot
+
+Cl.pl<-ggplot() +
+  scale_linetype_manual(values = 1:5, 
+        limits = sort(symbols), breaks = sort(symbols), name = "Cluster") +
+  facet_wrap(~Cluster) + 
+  geom_line(data = ClusterCurves, aes(x = Times,
+                                      y = Vol,
+                                      group = ID,
+                                      color = factor(Info)),
+            alpha=0.4) +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.line = element_line(colour = "black"), 
+        panel.background = element_blank(),
+        legend.position = "none") + 
+  geom_line(data = plot_data, aes(x = Times,
+                                  y = means, 
+                                  linetype = factor(Cluster)),
+            col="black",
+            size = 1.2) +
+  labs(title = paste("Other parameters: p = ",params$p, ", h = ", 3, ", G = ", params$Gselected, sep = ""),
+       y = "Vol", x = "Times")
+
+Cl.pl
+kable(countsCl)
+```
+
+```{r,results='asis', echo=FALSE,warning=FALSE,fig.width = 12, fig.height = 10}
+
+load(FileNameSave)
+CONNECTORList.cl$LabCurv -> LabCurve
+
+DataAllInfo<-DataAllInfo[DataAllInfo$LongID %in% LabCurve$LongID,]
+DataAllInfo.post <- DataAllInfo[as.Date(DataAllInfo$measure_date) >= (as.Date(DataAllInfo$start_date) -days.before)
+                                            & as.Date(DataAllInfo$measure_date) <= as.Date(DataAllInfo$end_date) ,]
+GrowDataFile.post <- DataAllInfo.post[, c("LongID","Time")]
+TruncTimeMin <- aggregate(GrowDataFile.post$Time,
+                          by=list(LongID=GrowDataFile.post$LongID),
+                          FUN="min")
+
+data<-merge(CLInfo[,-which(colnames(CLInfo)%in%c("ID","ShortID"))], DataAllInfo, by="LongID")
+data<-merge(data,TruncTimeMin,by="LongID")
+data[is.na(data)] <- "NA"
+
+FCMplots.post5$plotsCluster$MeanCurves -> Meancurves
+colnames(Meancurves)[3] <- "ClusterPost_Sub"
+Meancurves$ClusterPost_Sub <- paste0(ClusterName,tolower(Meancurves$ClusterPost_Sub ) )
+
+
+ggplot(data)+
+  facet_wrap(~ClusterPost_Sub)+
+  # geom_text(data=xy,mapping = aes(x = x, y = y, label = label))+
+  geom_line(aes(x=(Time-x),y=volume,group=ID,col=ClusterPost_Sub ),
+            alpha = .5)+
+  geom_line(data=Meancurves,
+            aes(x=Times,y=means,
+                linetype= ClusterPost_Sub,
+                group=ClusterPost_Sub),
+            col="black",size = 1.2 )+
+  geom_vline(xintercept = 0)
+
+
+MaximumDiscriminationFunction(MostProb_Post) -> MaxDiscr
+MaxDiscr[[1]]
+
+```

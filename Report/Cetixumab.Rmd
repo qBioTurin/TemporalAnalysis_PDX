@@ -1,0 +1,202 @@
+---
+title: "CONNECTOR analysis: PDX with cetixumab treatment"
+
+output:
+  html_document:
+    df_print: paged
+params:
+  Analysis:
+    value: x
+  p:
+    value: x
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(plyr)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE)
+library(connector)
+library(readr)
+
+source("./../Rfunctions/DataPreparation.R")
+
+
+```
+
+## Growth curves
+
+```{r,results='asis', echo=FALSE}
+
+CONNECTORList = DataFrameImport(GrowDataFile,
+                                AnnotationFileALL[,c(2,1,3:11)])
+
+gr<-GrowthCurve(CONNECTORList,"ID")
+
+grpl<-gr$GrowthCurve_plot 
+grpl$layers[[2]]$aes_params$alpha<-0.9 
+grpl$layers[[1]]$aes_params$alpha<-0.4 
+
+Dataplot<- gr$PlotData 
+
+pl<-ggplot(Dataplot)+
+  geom_line(aes(x=Time,y=Vol,col=as.factor(ID),group=ID),alpha=0.5)+
+  #geom_vline(data= TimeBeforeStartingMax, aes(xintercept=x,group=ID,col=as.factor(ID) ))+
+  theme(legend.position =  "none")
+#plotly::ggplotly(pl)
+pl
+```
+
+# Post start date before end date
+## Growth curves
+
+```{r,results='asis', echo=FALSE}
+CONNECTORList.post.tillEndDate = DataFrameImport(GrowDataFile.post.tillEndDate,
+                                                 AnnotationFile.post.tillEndDate[,c(2,1,3:11)])
+
+gr<-GrowthCurve(CONNECTORList.post.tillEndDate,"ShortID")
+
+grpl<-gr$GrowthCurve_plot 
+grpl$layers[[2]]$aes_params$alpha<-0.9 
+grpl$layers[[1]]$aes_params$alpha<-0.4 
+
+Dataplot<- gr$PlotData 
+
+pl<-ggplot(Dataplot)+
+  geom_line(aes(x=Time,y=Vol,col=ShortID,group=ID),alpha=0.5)+
+  theme(legend.position =  "none")
+
+#ggplotly(pl)
+pl
+vis<-TimeGridDensity(CONNECTORList)
+vis$TimeGrid_plot
+
+
+```
+
+
+## P selection
+
+```{r,results='asis', echo=FALSE}
+
+CrossLogFile<-"../Results/CrossLogLikePostEndDate.RData"
+if(file.exists(CrossLogFile)){
+  load(CrossLogFile)
+}else{
+  CrossLogLike<-BasisDimension.Choice(CONNECTORList.post.tillEndDate,3:8,Cores = 10)
+  save(CrossLogLike,file=CrossLogFile)
+}
+
+CrossLogLike$CrossLogLikePlot
+CrossLogLike$KnotsPlot
+
+p<- params$p
+```
+
+The *p* value selected is `r p`.
+
+
+## Clustering
+
+```{r,results='asis', echo=FALSE,warning=FALSE, include=FALSE}
+filePostBend<-paste0("ClusterAnalysisPostEndDate_p",p,".RData")
+if(file.exists(paste0("../Results/",filePostBend))){
+  load(paste0("../Results/",filePostBend))
+}else{
+  start.post <- Sys.time()
+  S.cl.Post.tillEndDate <-ClusterAnalysis(CONNECTORList.post.tillEndDate, 
+                                          G = 3:6, p = p,
+                                          runs=100,
+                                          Cores = 16)
+  end.time.post<- Sys.time() - start.post
+  for(i in 1:length(S.cl.Post.tillEndDate$Clusters.List) )
+  {
+    for(j in 1:length(S.cl.Post.tillEndDate$Clusters.List[[i]]$ClusterAll) )
+    {
+      colnames(S.cl.Post.tillEndDate$Clusters.List[[i]]$ClusterAll[[j]]$FCM$cluster$ClustCurve) =  c("ID","Times","Vol","Cluster")
+    }
+  }
+  
+  save(S.cl.Post.tillEndDate,end.time.post,file = paste0("../Results/p",p,"/",filePostBend))
+}
+
+
+bx<-IndexesPlot.Extrapolation(stability.list = S.cl.Post.tillEndDate)
+```
+
+```{r, results='asis', echo=FALSE, warning=FALSE }
+bx$Plot
+```
+
+```{r,results='asis', echo=FALSE,warning=FALSE}
+
+ConInfo<-ConsMatrix.Extrapolation(stability.list = S.cl.Post.tillEndDate)
+ConInfo$G4$ConsensusPlot
+ConInfo$G5$ConsensusPlot
+```
+
+### G = 3
+
+```{r,results='asis', echo=FALSE,warning=FALSE, include=FALSE}
+gPost=3
+MostProb_Post<-MostProbableClustering.Extrapolation(stability.list = S.cl.Post.tillEndDate, G=gPost)
+
+FCMplots.post<- ClusterWithMeanCurve(clusterdata = MostProb_Post,
+                                     feature = "ShortID",
+                                     labels = c("Time","Volume"),
+                                     title= " FCM model")
+
+```
+
+
+```{r,results='asis', echo=FALSE,warning=FALSE}
+FCMplots.post$plotsCluster$ALL$layers[[1]]$aes_params$alpha<-0.4
+
+FCMplots.post$plotsCluster$ALL+
+  theme(legend.position =  "none")
+
+```
+
+### G = 4
+
+```{r,results='asis', echo=FALSE,warning=FALSE, include=FALSE}
+gPost=4
+MostProb_Post<-MostProbableClustering.Extrapolation(stability.list = S.cl.Post.tillEndDate, G=gPost)
+
+FCMplots.post<- ClusterWithMeanCurve(clusterdata = MostProb_Post,
+                                     feature = "ShortID",
+                                     labels = c("Time","Volume"),
+                                     title= " FCM model")
+
+```
+
+
+```{r,results='asis', echo=FALSE,warning=FALSE}
+FCMplots.post$plotsCluster$ALL$layers[[1]]$aes_params$alpha<-0.4
+
+FCMplots.post$plotsCluster$ALL+
+  theme(legend.position =  "none")
+
+```
+
+
+### G = 5
+
+```{r,results='asis', echo=FALSE,warning=FALSE, include=FALSE}
+gPost=5
+MostProb_Post<-MostProbableClustering.Extrapolation(stability.list = S.cl.Post.tillEndDate, G=gPost)
+
+FCMplots.post<- ClusterWithMeanCurve(clusterdata = MostProb_Post,
+                                     feature = "ShortID",
+                                     labels = c("Time","Volume"),
+                                     title= " FCM model")
+
+```
+
+```{r,results='asis', echo=FALSE,warning=FALSE}
+FCMplots.post$plotsCluster$ALL$layers[[1]]$aes_params$alpha<-0.4
+
+FCMplots.post$plotsCluster$ALL+
+  theme(legend.position =  "none")
+
+```
