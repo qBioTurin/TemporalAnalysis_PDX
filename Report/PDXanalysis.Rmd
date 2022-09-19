@@ -5,8 +5,6 @@ output:
   html_document:
     df_print: paged
 params:
-  Analysis:
-    value: x
   p:
     value: x
 ---
@@ -20,7 +18,6 @@ library(connector)
 library(readr)
 
 source("./../Rfunctions/DataPreparation.R")
-
 
 ```
 

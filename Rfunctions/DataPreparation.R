@@ -34,12 +34,8 @@ data.generation<-function(data,min.point,type){
 }
 days.before <- 3
 
-cetuxiCurves <- read_delim("./Data/cetuxiCurves_long_header.tsv", 
-                       "\t", escape_double = FALSE, trim_ws = TRUE)
-
-###############################
-
-###############################
+cetuxiCurves <- read_delim("./Data/cetuxi_long_header.tsv", 
+                           "\t", escape_double = FALSE, trim_ws = TRUE)
 cetuxiCurves$longen <- paste0(cetuxiCurves$longen,"cetuxi")
 cetuxiCurves$sgen<-substring(cetuxiCurves$longen,1,7)
 
@@ -49,22 +45,18 @@ GrowthCurve<-NewData[[1]]
 ID<-NewData[[2]]
 data<-NewData[[3]]
 
-colnames(genetic_annotation)[1]<-"ShortID"
-
 TimeExpGroup = aggregate(data$measure_date,            
                          by=list(data$longen,
                                  data$sgen,
                                  data$exp_group),
                          FUN ="min")
 
-AnnotationFile <-  data.frame(ID = ID[TimeExpGroup$Group.1],
-                              LongID = TimeExpGroup$Group.1,
-                              ShortID = TimeExpGroup$Group.2,
-                              ExpGroup = TimeExpGroup$Group.3)
+AnnotationFileALL <-  data.frame(ID = ID[TimeExpGroup$Group.1],
+                                 LongID = TimeExpGroup$Group.1,
+                                 ShortID = TimeExpGroup$Group.2,
+                                 ExpGroup = TimeExpGroup$Group.3)
 
 
-AnnotationFileALL<-merge(AnnotationFile,genetic_annotation,by = "ShortID",all.x = T)
-unique(AnnotationFile[which(!AnnotationFile$ShortID %in% genetic_annotation$ShortID),]$ShortID)
 
 ###### check if there are double points
 data$ID <- ID[data$longen]
@@ -102,7 +94,7 @@ length(which(unlist(timediff) <= 0))
 DataAllInfo$Time <- GrowDataFile$Time
 
 CONNECTORList = DataFrameImport(GrowDataFile,
-                                AnnotationFileALL[,c(2,1,3:11)])
+                                AnnotationFileALL)
 
 #### before start date
 DataAllInfo.pre <- DataAllInfo[as.Date(DataAllInfo$start_date) >= as.Date(DataAllInfo$measure_date) ,]
@@ -175,7 +167,10 @@ AnnotationFile.pre = AnnotationFile.pre[AnnotationFile.pre$LongID %in% Annotatio
 GrowDataFile.pre = GrowDataFile.pre[GrowDataFile.pre$ID %in% AnnotationFile.pre$ID,]
 
 
-save(DataAllInfo,DataAllInfo.post,DataAllInfo.post.tillEndDate,
+save(AnnotationFile.post.tillEndDate,
+     GrowDataFile.post.tillEndDate,
+     GrowDataFile,
+     AnnotationFileALL,
      file = "./Data/TimeSeries.RData")
 
 

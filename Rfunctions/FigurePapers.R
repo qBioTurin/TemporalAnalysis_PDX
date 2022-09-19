@@ -3,13 +3,14 @@ library(dplyr)
 library(wesanderson)
 
 load("./Results/AllClusters_p4.RData")
-load("./Data/AllTimeSeries.RData")
+load("./Data/TimeSeries.RData")
 
 
 a = ClusteringComplete %>%
 	select(-ShortID) %>% na.omit() %>%
 	tidyr::gather(-LongID,value = "Clusters", key = "NumberOfClusters")
-b = DataAllInfo.post.tillEndDate %>% select(LongID,Time,volume) %>% distinct()
+a2 = merge(AnnotationFile.post.tillEndDate,GrowDataFile.post.tillEndDate)
+b = a2 %>% select(LongID,Time,volume) %>% distinct()
 c = merge(a,b,all.x = T)
 
 M = do.call("rbind",MeanValues)

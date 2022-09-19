@@ -7,8 +7,6 @@ output:
 params:
   pathRdata:
     value: x
-  Cut:
-    value: x
   Gpost:
     value: x
   Gselected:
@@ -49,7 +47,6 @@ updateNames = function(S.cl){
   return(S.cl)
 }
 
-Cut = params$Cut
 ClusterName = params$ClusterName
 pathRdata = params$pathRdata
 
@@ -59,10 +56,11 @@ library(plyr)
 library(connector)
 library(RColorBrewer)
 
-load(paste0("../",pathRdata,"/ClusterAnalysisPostEndDate",Cut,"_p", params$p,".RData") )
-source(paste0("../",pathRdata,"/../DataPreparation.R") )
+load(paste0("../",pathRdata,"/ClusterAnalysisPostEndDate_p", params$p,".RData") )
+source(paste0("./../DataPreparation.R") )
 
-## Seleziono solo il cluster 4 del post before EndDate 
+## Selecting the cluster params$Gpost from the stability.list and then let select 
+## the cluster "ClusterName" to segregating it!
 
 CONNECTORList.post.tillEndDate <- S.cl.Post.tillEndDate$CONNECTORList
 MostProb_Post<-MostProbableClustering.Extrapolation(stability.list = S.cl.Post.tillEndDate,
@@ -87,7 +85,7 @@ pl<-ggplot(Dataplot)+
   theme(legend.position =  "none")
 
 #ggplotly(pl)
-file= paste0("ClusterAnalysisPostEndDate",Cut,"G",params$Gpost,"_cl",ClusterName,"_p",params$p,".RData")
+file= paste0("ClusterAnalysisPostEndDateG",params$Gpost,"_cl",ClusterName,"_p",params$p,".RData")
 if(file.exists(paste0("../",pathRdata,"/",file))){
   load(paste0("../",pathRdata,"/",file))
 }else{
@@ -136,7 +134,7 @@ names(CLInfo) <- c("ID","ClusterPost_Sub","ShortID","LongID")
 
 CLInfo$ClusterPost_Sub <- paste0(ClusterName,tolower(MostProb_Post$FCM$cluster$cluster.names[CLInfo$ClusterPost_Sub]))
 
-FileNameSave = paste0("../",pathRdata,"/AnalysisCluster",params$Cut,"Post",ClusterName,"_G",params$Gselected,"_FromG",params$Gpost,"_p", params$p,".RData")
+FileNameSave = paste0("../",pathRdata,"/AnalysisClusterPost",ClusterName,"_G",params$Gselected,"_FromG",params$Gpost,"_p", params$p,".RData")
 save(CLInfo,file = FileNameSave )
 
 
